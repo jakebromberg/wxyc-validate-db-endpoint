@@ -1,0 +1,14 @@
+{
+  "name": "wxyc-validate-db-endpoint",
+  "version": "1.0.0",
+  "description": "Validates that the library DB is up and search is working",
+  "main": "wxyc-validate-db-endpoint.js",
+  "scripts": {
+    "start": "node wxyc-validate-db-endpoint.js"
+  },
+  "dependencies": {
+    "express": "^4.18.1",
+    "axios": "^0.27.2",
+    "dotenv": "^16.0.3"
+  }
+}

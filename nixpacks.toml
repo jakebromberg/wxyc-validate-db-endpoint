@@ -1,5 +1,2 @@
-[env]
-PORT = "8080"
-
 [phases.start]
 command = "node wxyc-validate-db-endpoint.js"

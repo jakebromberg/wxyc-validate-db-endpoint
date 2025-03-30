@@ -42,7 +42,12 @@ app.get('/', async (req, res) => {
     res.sendStatus(200);
   } catch (error) {
     console.error('Error occurred:', error);
-    res.status(502).send('Bad Gateway');
+      if (error.response) {
+        // Forward the original error status and data from Axios
+        res.status(error.response.status).send(error.response.data);
+      } else {
+        res.status(500).send(error.message);
+      }
   }
 });
 

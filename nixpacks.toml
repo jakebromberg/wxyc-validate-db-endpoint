@@ -1,2 +1,5 @@
+[phases.install]
+command = "npm install"
+
 [phases.start]
 command = "node wxyc-validate-db-endpoint.js"

@@ -1,31 +1,6 @@
 import express, { Request, Response } from 'express';
 import axios, { AxiosResponse } from 'axios';
-import dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config();
-
-// Validate required environment variables
-const requiredEnvVars = [
-  'LIBRARY_USER',
-  'LIBRARY_PASSWORD', 
-  'BASE_URL',
-  'LOGIN_ENDPOINT',
-  'SEARCH_ENDPOINT',
-  'DEFAULT_SEARCH_STRING',
-  'PORT',
-  'DB_HOST',
-  'SSH_HOST',
-  'SSH_USERNAME',
-  'SSH_PASSWORD'
-] as const;
-
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    console.error(`Missing required environment variable: ${envVar}`);
-    process.exit(1);
-  }
-}
+import { config } from './config';
 
 // Type definitions for API responses
 interface LoginResponse {
@@ -46,7 +21,7 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     // 1. Perform initial GET to trigger re-authentication
     const initialResponse: AxiosResponse<any, any> = await axios.get(
-      `${process.env.BASE_URL!}${process.env.LOGIN_ENDPOINT!}?mode=attemptReAuth`
+      `${config.BASE_URL}${config.LOGIN_ENDPOINT}?mode=attemptReAuth`
     );
     
     // Extract the first cookie from the "set-cookie" header
@@ -66,10 +41,10 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
       'Cookie': initialCookie,
     };
     
-    const loginData: string = `loginAction=userpw&user=${process.env.LIBRARY_USER!}&password=${process.env.LIBRARY_PASSWORD!}&returnURL=`;
+    const loginData: string = `loginAction=userpw&user=${config.LIBRARY_USER}&password=${config.LIBRARY_PASSWORD}&returnURL=`;
 
     await axios.post(
-      `${process.env.BASE_URL!}${process.env.LOGIN_ENDPOINT!}`, 
+      `${config.BASE_URL}${config.LOGIN_ENDPOINT}`, 
       loginData, 
       { headers: loginHeaders as any }
     );
@@ -81,7 +56,7 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
     };
     
     await axios.get(
-      `${process.env.BASE_URL!}${process.env.SEARCH_ENDPOINT!}?searchString=${process.env.DEFAULT_SEARCH_STRING!}`, 
+      `${config.BASE_URL}${config.SEARCH_ENDPOINT}?searchString=${config.DEFAULT_SEARCH_STRING}`, 
       { headers: searchHeaders as any }
     );
 
@@ -101,8 +76,6 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-const PORT: number = parseInt(process.env.PORT!, 10);
-
-app.listen(PORT, (): void => {
-  console.log(`Server is running on port ${PORT}`);
+app.listen(config.PORT, (): void => {
+  console.log(`Server is running on port ${config.PORT}`);
 }); 

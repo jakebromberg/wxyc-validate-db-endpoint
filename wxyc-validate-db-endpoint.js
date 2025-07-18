@@ -7,7 +7,7 @@ const app = express();
 app.get('/', async (req, res) => {
   try {
     // 1. Perform initial GET to trigger re-authentication
-    const initialResponse = await axios.get('http://www.wxyc.info/wxycdb/login?mode=attemptReAuth');
+    const initialResponse = await axios.get(`${process.env.BASE_URL}${process.env.LOGIN_ENDPOINT}?mode=attemptReAuth`);
     
     // Extract the first cookie from the "set-cookie" header
     const setCookieHeader = initialResponse.headers['set-cookie'];
@@ -23,9 +23,9 @@ app.get('/', async (req, res) => {
       'Accept-Encoding': 'gzip, deflate',
       'Cookie': initialCookie,
     };
-    const loginData = 'loginAction=userpw&user=${user}&password=${pass}&returnURL=';
+    const loginData = `loginAction=userpw&user=${process.env.LIBRARY_USER}&password=${process.env.LIBRARY_PASSWORD}&returnURL=`;
 
-    await axios.post('http://www.wxyc.info/wxycdb/login', loginData, {
+    await axios.post(`${process.env.BASE_URL}${process.env.LOGIN_ENDPOINT}`, loginData, {
       headers: loginHeaders,
     });
 
@@ -34,7 +34,7 @@ app.get('/', async (req, res) => {
       'Accept-Encoding': 'gzip, deflate',
       'Cookie': initialCookie,
     };
-    await axios.get('http://www.wxyc.info/wxycdb/searchCardCatalog?searchString=hello', {
+    await axios.get(`${process.env.BASE_URL}${process.env.SEARCH_ENDPOINT}?searchString=${process.env.DEFAULT_SEARCH_STRING}`, {
       headers: searchHeaders,
     });
 

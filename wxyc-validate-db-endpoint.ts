@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import axios from 'axios';
 import { config } from './config';
 import { EndpointValidator } from './EndpointValidator';
+import { EndpointRecovery } from './EndpointRecovery';
 
 // Type definitions for API responses
 interface LoginResponse {
@@ -15,12 +16,30 @@ const app = express();
 app.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const validator = new EndpointValidator();
-    await validator.validate();
-
-    // Return OK status if validation succeeds
-    res.sendStatus(200);
+    
+    try {
+      // Attempt validation
+      await validator.validate();
+      console.log('Endpoint validation successful');
+      res.sendStatus(200);
+    } catch (validationError) {
+      console.log('Validation failed, checking if recovery should be attempted...');
+      
+      // Check if we should attempt recovery
+      if (EndpointRecovery.shouldAttemptRecovery(validationError)) {
+        console.log('Attempting endpoint recovery...');
+        
+        const recovery = new EndpointRecovery();
+        await recovery.recover();
+        console.log('Recovery completed successfully');
+        res.sendStatus(200);
+      } else {
+        console.log('Error is not recoverable, failing immediately');
+        throw validationError;
+      }
+    }
   } catch (error: unknown) {
-    console.error('Error occurred:', error);
+    console.error('Final error occurred:', error);
     
     if (axios.isAxiosError(error) && error.response) {
       // Forward the original error status and data from Axios

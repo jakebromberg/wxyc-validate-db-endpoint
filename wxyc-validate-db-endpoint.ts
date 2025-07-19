@@ -31,8 +31,17 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
         
         const recovery = new EndpointRecovery();
         await recovery.recover();
-        console.log('Recovery completed successfully');
-        res.sendStatus(200);
+        console.log('Recovery completed, re-validating endpoint...');
+        
+        // CRITICAL: Re-validate after recovery to ensure it actually worked
+        try {
+          await validator.validate();
+          console.log('Post-recovery validation successful');
+          res.sendStatus(200);
+        } catch (revalidationError) {
+          console.log('Post-recovery validation failed - recovery was not effective');
+          throw revalidationError;
+        }
       } else {
         console.log('Error is not recoverable, failing immediately');
         throw validationError;
@@ -52,6 +61,12 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-app.listen(config.PORT, (): void => {
-  console.log(`Server is running on port ${config.PORT}`);
-}); 
+// Export the app for testing
+export default app;
+
+// Only start the server if this file is run directly (not imported)
+if (require.main === module) {
+  app.listen(config.PORT, (): void => {
+    console.log(`Server is running on port ${config.PORT}`);
+  }); 
+} 

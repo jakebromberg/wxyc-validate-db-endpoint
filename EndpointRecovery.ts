@@ -1,4 +1,5 @@
 import { config } from './config';
+import { NodeSSH } from 'node-ssh';
 
 export class EndpointRecovery {
   /**
@@ -21,20 +22,54 @@ export class EndpointRecovery {
   }
 
   /**
-   * Handles database-related recovery operations
+   * Handles database-related recovery operations via SSH
    */
   private async performDatabaseRecovery(): Promise<void> {
-    console.log('Performing database recovery...');
+    console.log('Performing database recovery via SSH...');
     
-    // TODO: Implement database recovery logic
-    // This could include:
-    // - Restarting database services
-    // - Clearing corrupted cache
-    // - Reconnecting to database
-    // - Running database health checks
+    const ssh = new NodeSSH();
     
-    // Placeholder for database recovery
-    await this.simulateAsyncOperation('Database recovery', 1000);
+    try {
+      // Connect to the SSH host
+      console.log(`  - Connecting to SSH host: ${config.SSH_HOST}`);
+      await ssh.connect({
+        host: config.SSH_HOST,
+        username: config.SSH_USERNAME,
+        password: config.SSH_PASSWORD,
+      });
+      
+      console.log('  - SSH connection established');
+      
+      // Execute the Tomcat restart command
+      console.log('  - Executing Tomcat restart command...');
+      const result = await ssh.execCommand('./stopTomcat && sleep 5 && ./startTomcat');
+      
+      console.log(`  - Command stdout: ${result.stdout}`);
+      if (result.stderr) {
+        console.log(`  - Command stderr: ${result.stderr}`);
+      }
+      console.log(`  - Command exit code: ${result.code}`);
+      
+      // Close SSH connection
+      ssh.dispose();
+      
+      // Check if the command was successful
+      if (result.code !== 0) {
+        throw new Error(`Tomcat restart command failed with exit code ${result.code}: ${result.stderr || 'Unknown error'}`);
+      }
+      
+      console.log('  - Database recovery completed successfully');
+      
+    } catch (error) {
+      // Ensure SSH connection is closed even if an error occurs
+      ssh.dispose();
+      
+      if (error instanceof Error) {
+        throw new Error(`Database recovery failed: ${error.message}`);
+      } else {
+        throw new Error('Database recovery failed: Unknown error');
+      }
+    }
   }
 
   /**
@@ -43,15 +78,13 @@ export class EndpointRecovery {
   private async performServiceRecovery(): Promise<void> {
     console.log('Performing service recovery...');
     
-    // TODO: Implement service recovery logic
-    // This could include:
+    // For now, service recovery is minimal - just log that we attempted it
+    // In the future, this could include:
     // - Restarting application services
     // - Clearing application cache
     // - Reinitializing connections
-    // - SSH operations if needed
     
-    // Placeholder for service recovery
-    await this.simulateAsyncOperation('Service recovery', 800);
+    console.log('  - Service recovery completed (no additional actions required)');
   }
 
   /**
@@ -71,16 +104,31 @@ export class EndpointRecovery {
    * @returns boolean - Whether recovery should be attempted
    */
   static shouldAttemptRecovery(error: unknown): boolean {
-    // Only attempt recovery for certain types of errors
+    // Don't attempt recovery for certain types of errors
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
       
-      // Attempt recovery for common recoverable errors
+      // Don't attempt recovery for authentication/credential related errors
+      if (message.includes('unauthorized') ||
+          message.includes('authentication') ||
+          message.includes('login') ||
+          message.includes('credential') ||
+          message.includes('password') ||
+          message.includes('403') ||
+          message.includes('401')) {
+        console.log('Authentication/credential error detected - recovery not applicable');
+        return false;
+      }
+      
+      // Attempt recovery for infrastructure/connectivity issues
       return message.includes('connection') ||
              message.includes('timeout') ||
              message.includes('network') ||
              message.includes('gateway') ||
-             message.includes('service unavailable');
+             message.includes('service unavailable') ||
+             message.includes('502') ||
+             message.includes('503') ||
+             message.includes('504');
     }
     
     return false;

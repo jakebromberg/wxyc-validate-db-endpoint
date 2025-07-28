@@ -50,8 +50,26 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
   } catch (error: any) {
     console.error('Error occurred:', error);
     if (error.response) {
-      // Forward the original error status and data from Axios
-      res.status(error.response.status).send(error.response.data);
+      // Invoke the reset route when there's an HTTP error response
+      try {
+        console.log('HTTP error detected, invoking reset route...');
+        const resetResponse = await axios.get(`http://localhost:${PORT}/reset`);
+        console.log('Reset route invoked successfully:', resetResponse.status);
+        
+        // Return success after reset
+        res.status(200).json({ 
+          message: 'Error detected and reset performed successfully',
+          originalError: {
+            status: error.response.status,
+            data: error.response.data
+          },
+          resetResult: resetResponse.data
+        });
+      } catch (resetError: any) {
+        console.error('Failed to invoke reset route:', resetError);
+        // If reset fails, return the original error
+        res.status(error.response.status).send(error.response.data);
+      }
     } else {
       res.status(500).send(error.message);
     }

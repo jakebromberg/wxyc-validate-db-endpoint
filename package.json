@@ -2,13 +2,23 @@
   "name": "wxyc-validate-db-endpoint",
   "version": "1.0.0",
   "description": "Validates that the library DB is up and search is working",
-  "main": "wxyc-validate-db-endpoint.js",
+  "main": "dist/wxyc-validate-db-endpoint.js",
   "scripts": {
-    "start": "node wxyc-validate-db-endpoint.js"
+    "build": "tsc",
+    "start": "node dist/wxyc-validate-db-endpoint.js",
+    "dev": "tsc && node dist/wxyc-validate-db-endpoint.js",
+    "watch": "tsc --watch"
   },
   "dependencies": {
     "express": "^4.18.1",
     "axios": "^0.27.2",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "node-ssh": "^13.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.10.1",
+    "@types/express": "^5.0.0",
+    "@types/node-ssh": "^7.0.1"
   }
 }

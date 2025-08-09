@@ -14,6 +14,7 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     // 1. Perform initial GET to trigger re-authentication
     const initialResponse: AxiosResponse = await axios.get('http://www.wxyc.info/wxycdb/login?mode=attemptReAuth');
+    console.log('Initial re-auth GET succeeded:', initialResponse.status);
     
     // Extract the first cookie from the "set-cookie" header
     const setCookieHeader: string[] | undefined = initialResponse.headers['set-cookie'];
@@ -32,18 +33,20 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
     };
     const loginData: string = 'loginAction=userpw&user=${user}&password=${pass}&returnURL=';
 
-    await axios.post('http://www.wxyc.info/wxycdb/login', loginData, {
+    const loginResponse = await axios.post('http://www.wxyc.info/wxycdb/login', loginData, {
       headers: loginHeaders,
     });
+    console.log('Login POST succeeded:', loginResponse.status);
 
     // 3. Perform a search request using the same cookie
     const searchHeaders: Record<string, string> = {
       'Accept-Encoding': 'gzip, deflate',
       'Cookie': initialCookie,
     };
-    await axios.get('http://www.wxyc.info/wxycdb/searchCardCatalog?searchString=hello', {
+    const searchResponse = await axios.get('http://www.wxyc.info/wxycdb/searchCardCatalog?searchString=hello', {
       headers: searchHeaders,
     });
+    console.log('Search GET succeeded:', searchResponse.status);
 
     // Return OK status if everything succeeds
     res.sendStatus(200);

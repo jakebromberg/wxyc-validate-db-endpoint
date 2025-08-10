@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import axios, { AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import dotenv from 'dotenv';
 import { NodeSSH } from 'node-ssh';
 
@@ -10,10 +10,28 @@ const app = express();
 // Middleware to parse JSON bodies
 app.use(express.json());
 
+// Create an axios client with a conservative timeout so requests finish well under common 30s proxies/monitors
+const DEFAULT_AXIOS_TIMEOUT_MS: number = parseInt(process.env.AXIOS_TIMEOUT_MS || '8000', 10);
+const httpClient: AxiosInstance = axios.create({
+  timeout: DEFAULT_AXIOS_TIMEOUT_MS,
+});
+
+// Lightweight health endpoint for uptime monitors
+app.get('/healthz', (req: Request, res: Response): void => {
+  res.status(200).send('ok');
+});
+
 app.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
+    // Abort external requests if the client disconnects
+    const abortController = new AbortController();
+    req.on('close', () => abortController.abort());
+
     // 1. Perform initial GET to trigger re-authentication
-    const initialResponse: AxiosResponse = await axios.get('http://www.wxyc.info/wxycdb/login?mode=attemptReAuth');
+    const initialResponse: AxiosResponse = await httpClient.get(
+      'http://www.wxyc.info/wxycdb/login?mode=attemptReAuth',
+      { signal: abortController.signal }
+    );
     console.log('Initial re-auth GET succeeded:', initialResponse.status);
     
     // Extract the first cookie from the "set-cookie" header
@@ -33,8 +51,9 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
     };
     const loginData: string = 'loginAction=userpw&user=${user}&password=${pass}&returnURL=';
 
-    const loginResponse = await axios.post('http://www.wxyc.info/wxycdb/login', loginData, {
+    const loginResponse = await httpClient.post('http://www.wxyc.info/wxycdb/login', loginData, {
       headers: loginHeaders,
+      signal: abortController.signal,
     });
     console.log('Login POST succeeded:', loginResponse.status);
 
@@ -43,8 +62,9 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
       'Accept-Encoding': 'gzip, deflate',
       'Cookie': initialCookie,
     };
-    const searchResponse = await axios.get('http://www.wxyc.info/wxycdb/searchCardCatalog?searchString=hello', {
+    const searchResponse = await httpClient.get('http://www.wxyc.info/wxycdb/searchCardCatalog?searchString=hello', {
       headers: searchHeaders,
+      signal: abortController.signal,
     });
     console.log('Search GET succeeded:', searchResponse.status);
 
@@ -164,6 +184,9 @@ app.get('/reset', async (req: Request, res: Response): Promise<void> => {
 });
 
 const PORT: number = parseInt(process.env.PORT || '3000', 10);
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-}); 
+});
+
+// Keep server timeouts under common 30s reverse-proxy/monitor thresholds
+server.setTimeout(parseInt(process.env.SERVER_TIMEOUT_MS || '25000', 10));

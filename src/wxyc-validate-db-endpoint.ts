@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import dns from 'node:dns';
+import http from 'node:http';
 import dotenv from 'dotenv';
 import { NodeSSH } from 'node-ssh';
 
@@ -12,8 +14,18 @@ app.use(express.json());
 
 // Create an axios client with a conservative timeout so requests finish well under common 30s proxies/monitors
 const DEFAULT_AXIOS_TIMEOUT_MS: number = parseInt(process.env.AXIOS_TIMEOUT_MS || '8000', 10);
+
+// Prefer IPv4 to avoid potential IPv6 routing/timeouts
+dns.setDefaultResultOrder('ipv4first');
+
+// Reuse a keep-alive agent and explicitly disable proxy auto-detection
+const httpAgent = new http.Agent({ keepAlive: true, timeout: DEFAULT_AXIOS_TIMEOUT_MS });
+
 const httpClient: AxiosInstance = axios.create({
   timeout: DEFAULT_AXIOS_TIMEOUT_MS,
+  httpAgent,
+  // Some environments set HTTP(S)_PROXY; the target is plain HTTP and local network—avoid proxy hops
+  proxy: false as any,
 });
 
 // Lightweight health endpoint for uptime monitors
@@ -62,7 +74,8 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
       'Accept-Encoding': 'gzip, deflate',
       'Cookie': initialCookie,
     };
-    const searchResponse = await httpClient.get('http://www.wxyc.info/wxycdb/searchCardCatalog?searchString=hello', {
+    const query = process.env.DEFAULT_SEARCH_STRING;
+    const searchResponse = await httpClient.get('http://www.wxyc.info/wxycdb/searchCardCatalog?searchString=${query}', {
       headers: searchHeaders,
       signal: abortController.signal,
     });
@@ -72,26 +85,35 @@ app.get('/', async (req: Request, res: Response): Promise<void> => {
     res.sendStatus(200);
   } catch (error: any) {
     console.error('Error occurred:', error);
-    if (error.response) {
-      // Invoke the reset route when there's an HTTP error response
+    const isTimeout: boolean =
+      error?.code === 'ECONNABORTED' ||
+      (typeof error?.message === 'string' && error.message.toLowerCase().includes('timeout'));
+
+    if (error.response || isTimeout) {
+      // Invoke the reset route when there's an HTTP error response or a timeout/no-response condition
       try {
-        console.log('HTTP error detected, invoking reset route...');
+        console.log('HTTP error or timeout detected, invoking reset route...');
         const resetResponse = await axios.get(`http://localhost:${PORT}/reset`);
         console.log('Reset route invoked successfully:', resetResponse.status);
-        
+
         // Return success after reset
-        res.status(200).json({ 
+        res.status(200).json({
           message: 'Error detected and reset performed successfully',
           originalError: {
-            status: error.response.status,
-            data: error.response.data
+            status: error.response?.status || null,
+            data: error.response?.data || null,
+            code: error.code || null
           },
           resetResult: resetResponse.data
         });
       } catch (resetError: any) {
         console.error('Failed to invoke reset route:', resetError);
         // If reset fails, return the original error
-        res.status(error.response.status).send(error.response.data);
+        if (error.response) {
+          res.status(error.response.status).send(error.response.data);
+        } else {
+          res.status(500).send(error.message);
+        }
       }
     } else {
       res.status(500).send(error.message);

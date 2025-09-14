@@ -156,9 +156,17 @@ app.get('/reset', async (req: Request, res: Response): Promise<void> => {
     
     console.log('SSH connection established successfully');
 
-    // Execute the script with explicit Java environment setup for ksh
-    // First, kill any running Tomcat processes
-    const killCommand = "export JAVA_HOME=/usr/lib/java; export PATH=/usr/local/jdk/bin:$PATH; pkill -f tomcat || true";
+    // Execute Tomcat process management commands
+    // First, check how many Tomcat processes are running
+    const countCommand = "pgrep -f tomcat | wc -l";
+    console.log(`Checking Tomcat process count: ${countCommand}`);
+    
+    const countResult = await ssh.execCommand(countCommand);
+    console.log(`Tomcat process count: ${countResult.stdout.trim()}`);
+    if (countResult.stderr) console.log(`Count stderr: ${countResult.stderr}`);
+    
+    // Then kill any running Tomcat processes
+    const killCommand = "pkill -f tomcat || true";
     console.log(`Executing kill command: ${killCommand}`);
     
     const killResult = await ssh.execCommand(killCommand);
@@ -167,7 +175,7 @@ app.get('/reset', async (req: Request, res: Response): Promise<void> => {
     if (killResult.stderr) console.log(`Kill stderr: ${killResult.stderr}`);
     
     // Then execute the restart sequence
-    const restartCommand = "export JAVA_HOME=/usr/lib/java; export PATH=/usr/local/jdk/bin:$PATH; ./stopTomcat.sh && sleep 5 && ./startTomcat.sh";
+    const restartCommand = "./stopTomcat.sh && sleep 5 && ./startTomcat.sh";
     console.log(`Executing restart command: ${restartCommand}`);
     
     const result = await ssh.execCommand(restartCommand);
